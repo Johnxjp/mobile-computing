@@ -1,13 +1,11 @@
 """Pre-compute CLIP image embeddings and build a product metadata index."""
 
+import argparse
 import json
 from pathlib import Path
 
 import numpy as np
-import open_clip
 import pandas as pd
-import torch
-from PIL import Image
 
 DATA_DIR = Path("data")
 IMAGES_DIR = DATA_DIR / "images"
@@ -18,6 +16,7 @@ PARQUET_FILE = DATA_DIR / "products.parquet"
 MODEL_NAME = "ViT-B-32"
 PRETRAINED = "openai"
 BATCH_SIZE = 128
+EMBEDDING_DIM = 512
 
 
 def load_metadata() -> pd.DataFrame:
@@ -36,6 +35,10 @@ def build_embeddings(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
 
     Returns (product_ids, embeddings) where embeddings is (N, D) float32.
     """
+    import open_clip
+    import torch
+    from PIL import Image
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
@@ -92,12 +95,34 @@ def build_embeddings(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     return ids_array, embeddings_array
 
 
+def build_mock_embeddings(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """Generate random embeddings for testing without network access."""
+    product_ids = df["id"].values
+    rng = np.random.default_rng(42)
+    embeddings = rng.standard_normal((len(product_ids), EMBEDDING_DIM)).astype(np.float32)
+    # L2 normalize to match real CLIP output
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    embeddings = embeddings / norms
+    return product_ids, embeddings
+
+
 def main():
+    parser = argparse.ArgumentParser(description="Build CLIP embedding index")
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Generate random embeddings (for testing without network access)",
+    )
+    args = parser.parse_args()
+
     df = load_metadata()
 
-    # Build and save CLIP embeddings
-    print(f"\nLoading CLIP model ({MODEL_NAME}/{PRETRAINED})...")
-    product_ids, embeddings = build_embeddings(df)
+    if args.mock:
+        print("\nGenerating mock embeddings (random, for testing only)...")
+        product_ids, embeddings = build_mock_embeddings(df)
+    else:
+        print(f"\nLoading CLIP model ({MODEL_NAME}/{PRETRAINED})...")
+        product_ids, embeddings = build_embeddings(df)
     print(f"Embeddings shape: {embeddings.shape}")
 
     np.savez(EMBEDDINGS_FILE, ids=product_ids, embeddings=embeddings)
