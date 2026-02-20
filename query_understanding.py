@@ -4,8 +4,8 @@ import json
 import os
 from pathlib import Path
 
+import httpx
 import pandas as pd
-from openai import OpenAI
 
 PROMPT_FILE = Path(__file__).parent / "prompts" / "query_understanding.txt"
 
@@ -21,7 +21,7 @@ FILTER_FIELDS = [
 ]
 
 # OpenRouter config — override with env vars as needed.
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4")
 
 
@@ -59,20 +59,24 @@ def parse_query(user_query: str, field_values: dict[str, list[str]]) -> dict:
 
     Requires OPENROUTER_API_KEY environment variable.
     """
-    client = OpenAI(
-        base_url=OPENROUTER_BASE_URL,
-        api_key=os.environ["OPENROUTER_API_KEY"],
-    )
-
     prompt = build_prompt(user_query, field_values)
 
-    response = client.chat.completions.create(
-        model=OPENROUTER_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
+    response = httpx.post(
+        OPENROUTER_URL,
+        headers={
+            "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": OPENROUTER_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0,
+        },
+        timeout=30,
     )
+    response.raise_for_status()
 
-    raw = response.choices[0].message.content.strip()
+    raw = response.json()["choices"][0]["message"]["content"].strip()
 
     # Strip markdown code fences if the model wraps its response.
     if raw.startswith("```"):
