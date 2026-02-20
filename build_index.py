@@ -111,8 +111,12 @@ def main():
     print(f"\nIndex built:")
     print(f"  Products: {len(product_ids)}")
     print(f"  Embedding dim: {embeddings.shape[1]}")
-    print(f"  Embeddings file: {EMBEDDINGS_FILE} ({EMBEDDINGS_FILE.stat().st_size / 1e6:.1f} MB)")
-    print(f"  Metadata file: {PARQUET_FILE} ({PARQUET_FILE.stat().st_size / 1e6:.1f} MB)")
+    print(
+        f"  Embeddings file: {EMBEDDINGS_FILE} ({EMBEDDINGS_FILE.stat().st_size / 1e6:.1f} MB)"
+    )
+    print(
+        f"  Metadata file: {PARQUET_FILE} ({PARQUET_FILE.stat().st_size / 1e6:.1f} MB)"
+    )
 
 
 if __name__ == "__main__":
